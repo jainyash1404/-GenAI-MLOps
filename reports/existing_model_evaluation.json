@@ -1,0 +1,10 @@
+{
+  "model": "models/student_model.pkl",
+  "data": "data/new_student_performance.csv",
+  "rows_evaluated": 120,
+  "metrics": {
+    "MAE": 5.382755129172769,
+    "RMSE": 6.724911042275182,
+    "R2": 0.7185305904618591
+  }
+}

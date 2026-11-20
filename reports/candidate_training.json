@@ -1,0 +1,15 @@
+{
+  "training_data": [
+    "data/student_performance.csv",
+    "data/new_student_performance.csv"
+  ],
+  "training_rows": 720,
+  "candidate_model": "models/student_model_candidate.pkl",
+  "metrics": {
+    "MAE": 4.836033121054996,
+    "RMSE": 6.145793586509237,
+    "R2": 0.7960760930022753
+  },
+  "mlflow_logged": false,
+  "mlflow_run_id": null
+}

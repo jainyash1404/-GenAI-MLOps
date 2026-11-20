@@ -1,6 +1,6 @@
 {
-    "status": "drift",
-    "drift_detected": true,
-    "message": "Data drift detected!",
-    "rows_checked": 11
+    "status": "stable",
+    "drift_detected": false,
+    "message": "Data distribution is stable.",
+    "rows_checked": 12
 }

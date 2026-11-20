@@ -1,0 +1,25 @@
+{
+  "data": "data/new_student_performance.csv",
+  "rows_compared": 120,
+  "primary_metric": "RMSE",
+  "metric_direction": "lower_is_better",
+  "criterion": "Candidate RMSE must be lower than champion RMSE on the same labelled batch.",
+  "champion": {
+    "model": "models/student_model.pkl",
+    "metrics": {
+      "MAE": 5.382755129172769,
+      "RMSE": 6.724911042275182,
+      "R2": 0.7185305904618591
+    }
+  },
+  "candidate": {
+    "model": "models/student_model_candidate.pkl",
+    "metrics": {
+      "MAE": 3.0942108551242864,
+      "RMSE": 3.912140776900223,
+      "R2": 0.9047451575492997
+    }
+  },
+  "decision": "eligible_for_promotion",
+  "champion_overwritten": false
+}

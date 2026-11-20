@@ -3,3 +3,6 @@ evidently==0.4.40
 scikit-learn
 pandas
 joblib
+streamlit
+python-dotenv
+google-genai
