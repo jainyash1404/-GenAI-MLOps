@@ -1,95 +1,134 @@
 # EduPredict AI
 
-EduPredict AI is a student performance prediction application built with
-Python, Streamlit, and a Random Forest regression model. It includes a basic
-MLOps workflow for validating new labelled data, evaluating the deployed
-model, retraining a candidate, and applying a quality gate before promotion.
+> An end-to-end student performance prediction and model-quality monitoring
+> platform built with Python, Streamlit, and scikit-learn.
 
-## Features
+EduPredict AI predicts a student's final score from academic and lifestyle
+inputs, assigns a risk level, and can generate personalized study guidance.
+The project also demonstrates a practical MLOps lifecycle: validate incoming
+data, evaluate the deployed champion, train a separate candidate, and record a
+safe promotion decision.
 
-- Student final-score prediction from attendance, study hours, previous score,
-  assignment completion, and sleep hours.
-- Risk classification and optional Gemini-powered study recommendations.
-- Prediction history stored in `logs/predictions.csv`.
-- Input distribution monitoring against the training statistics.
+## Contents
+
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Using the application](#using-the-application)
+- [Running the MLOps workflow](#running-the-mlops-workflow)
+- [Quality gate](#quality-gate)
+- [Execution evidence](#execution-evidence)
+- [Project structure](#project-structure)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+
+## Highlights
+
+- Random Forest regression for `final_score` prediction.
+- Student risk categories: Low, Moderate, and High.
+- Streamlit dashboard with prediction history.
+- Optional Gemini-powered academic recommendations.
+- Incoming-batch validation for schema, missing values, and duplicates.
+- Champion evaluation with MAE, RMSE, and R².
+- Separate candidate artifact trained from combined historical and new data.
 - Evidently data-drift report generation.
-- Champion-versus-candidate quality gate using RMSE.
-- MLflow integration when MLflow is installed and available.
+- Auditable RMSE-based quality gate.
+- Champion model is never overwritten automatically.
+- MLflow logging support when MLflow is available.
 
-## Project structure
+## Architecture
 
 ```text
-app.py                         Streamlit application
-train_model.py                Original champion-model training
-prepare_new_data.py           New-batch generation and validation
-evaluate_existing_model.py    Champion evaluation on the new batch
-train_candidate_model.py      Candidate training on combined data
-quality_gate.py               Candidate promotion decision
-run_monitoring_workflow.py    End-to-end monitoring workflow
-mlops_monitor.py              Evidently drift monitoring
-data/student_performance.csv  Original labelled training data
-data/new_student_performance.csv
-models/student_model.pkl      Champion model
-models/student_model_candidate.pkl
-reports/                      Validation, evaluation, training, and gate reports
+Incoming labelled batch
+          |
+          v
+  prepare_new_data.py
+          |
+          v
+ Champion evaluation  ------> reports/existing_model_evaluation.json
+          |
+          v
+ Combined-data candidate training
+          |
+          v
+ Champion vs candidate quality gate
+          |
+          +----> eligible_for_promotion
+          |
+          +----> retain_champion
 ```
 
-## Setup
+The deployed champion remains at `models/student_model.pkl`. The newly trained
+candidate is always written to `models/student_model_candidate.pkl`.
 
-Use Python 3.10 or newer:
+## Quick start
+
+### 1. Create an environment
+
+Python 3.10 or newer is recommended.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements-mlops.txt
 ```
 
-On Windows PowerShell, activate the environment with:
+On Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-## Run the application
+### 2. Install dependencies
 
 ```bash
-streamlit run app.py
+python -m pip install -r requirements-mlops.txt
 ```
 
-Open [http://localhost:8501](http://localhost:8501). The sidebar provides:
+### 3. Start the dashboard
 
-- Overview
-- Student Prediction
-- AI Insights
-- MLOps Monitoring
-- Prediction History
-
-Gemini recommendations are optional. To enable them, create a `.env` file:
-
-```env
-GEMINI_API_KEY=your_api_key_here
+```bash
+python -m streamlit run app.py
 ```
 
-Do not commit `.env` or API keys.
+Open [http://localhost:8501](http://localhost:8501).
 
-## Run the monitoring workflow
+## Using the application
 
-Run the complete workflow with:
+Use the sidebar to switch between:
+
+| Page | Purpose |
+|---|---|
+| **Overview** | View model status and project KPIs |
+| **Student Prediction** | Enter student data and generate a score |
+| **AI Insights** | Generate a personalized study plan |
+| **MLOps Monitoring** | Run the Evidently drift check and download its report |
+| **Prediction History** | Review logged predictions |
+
+Every prediction is appended to `logs/predictions.csv`. The MLOps Monitoring
+page compares current input data with the training statistics and writes:
+
+- `reports/data_drift_report.html`
+- `reports/drift_status.json`
+
+## Running the MLOps workflow
+
+Run all monitoring and retraining stages in one command:
 
 ```bash
 python run_monitoring_workflow.py
 ```
 
-The workflow performs these steps:
+The workflow executes:
 
-1. Validates the new labelled batch for required columns, missing values, and
-   duplicate rows.
-2. Evaluates the champion model using MAE, RMSE, and R².
-3. Combines the original and new data and trains a separate candidate model.
-4. Compares champion and candidate on the same labelled batch.
-5. Records a promotion decision without overwriting the champion.
+1. **Prepare new data** — validates the incoming labelled batch.
+2. **Evaluate champion** — predicts on the new batch and records regression
+   metrics.
+3. **Train candidate** — combines the original 600 rows with the new 120-row
+   batch and saves a separate model.
+4. **Apply quality gate** — compares both models on the same labelled batch.
+5. **Record evidence** — writes a complete execution summary.
 
-Individual steps can also be run:
+To run stages independently:
 
 ```bash
 python prepare_new_data.py --generate
@@ -100,39 +139,121 @@ python quality_gate.py
 
 ## Quality gate
 
-RMSE is the primary promotion metric because it penalizes larger prediction
-errors more strongly. A candidate is marked `eligible_for_promotion` only when
-its RMSE is lower than the champion's RMSE on the same labelled batch.
-The champion model is never overwritten automatically.
+The primary metric is **RMSE**. It is appropriate here because this is a
+regression problem and RMSE penalizes larger prediction errors more strongly
+than smaller errors.
 
-The decision is saved to:
+The decision rule is:
 
 ```text
-reports/quality_gate_decision.json
+if candidate_RMSE < champion_RMSE:
+    eligible_for_promotion
+else:
+    retain_champion
 ```
 
-## Current demonstration results
+Both models are evaluated on the same labelled batch to make the comparison
+fair. The decision is stored in
+`reports/quality_gate_decision.json`, and the field
+`champion_overwritten` explicitly records that the champion was not replaced.
 
-The included workflow was successfully executed on 120 new labelled rows:
+## Execution evidence
+
+The workflow has been executed successfully on 120 new labelled rows.
 
 | Model | MAE | RMSE | R² |
 |---|---:|---:|---:|
 | Champion | 5.3828 | 6.7249 | 0.7185 |
 | Candidate | 3.0942 | 3.9121 | 0.9047 |
 
-The candidate was marked eligible for promotion, while the champion artifact
-remained unchanged. See
-`reports/monitoring_workflow_summary.json` for the complete run summary.
+Result: **`eligible_for_promotion`**
 
-## MLflow
+Evidence artifacts:
+
+| Artifact | Location |
+|---|---|
+| New-data validation | `reports/new_data_validation.json` |
+| Champion evaluation | `reports/existing_model_evaluation.json` |
+| Candidate training report | `reports/candidate_training.json` |
+| Candidate model | `models/student_model_candidate.pkl` |
+| Quality-gate decision | `reports/quality_gate_decision.json` |
+| Complete run summary | `reports/monitoring_workflow_summary.json` |
+
+## Project structure
+
+```text
+.
+├── app.py
+├── requirements-mlops.txt
+├── data/
+│   ├── student_performance.csv
+│   ├── new_student_performance.csv
+│   └── training_stats.json
+├── models/
+│   ├── student_model.pkl
+│   └── student_model_candidate.pkl
+├── reports/
+│   ├── new_data_validation.json
+│   ├── existing_model_evaluation.json
+│   ├── candidate_training.json
+│   ├── quality_gate_decision.json
+│   └── monitoring_workflow_summary.json
+├── logs/
+│   └── predictions.csv
+├── prepare_new_data.py
+├── evaluate_existing_model.py
+├── train_candidate_model.py
+├── quality_gate.py
+├── run_monitoring_workflow.py
+├── mlops_monitor.py
+└── README.md
+```
+
+## Configuration
+
+Gemini recommendations are optional. To enable them, create a local `.env`
+file:
+
+```env
+GEMINI_API_KEY=your_api_key_here
+```
+
+Never commit API keys or `.env` files.
+
+### MLflow
 
 Candidate training logs parameters, metrics, and the model artifact to the
-`EduPredict-AI` MLflow experiment when MLflow is available:
+`EduPredict-AI` experiment when MLflow is installed:
 
 ```bash
 mlflow ui --backend-store-uri ./mlruns
 ```
 
-Then open [http://localhost:5000](http://localhost:5000). The candidate
-training report records whether MLflow logging succeeded.
+Then open [http://localhost:5000](http://localhost:5000). The field
+`mlflow_logged` in `reports/candidate_training.json` records whether logging
+succeeded for that run.
+
+## Troubleshooting
+
+### `streamlit: command not found`
+
+Install the requirements and use the module form:
+
+```bash
+python -m pip install -r requirements-mlops.txt
+python -m streamlit run app.py
+```
+
+### MLOps Monitoring page fails to load
+
+Evidently is required for drift monitoring:
+
+```bash
+python -m pip install evidently==0.4.40
+```
+
+### Gemini recommendations are unavailable
+
+The prediction dashboard still works without Gemini. Configure
+`GEMINI_API_KEY` in `.env` to enable AI recommendations.
 
